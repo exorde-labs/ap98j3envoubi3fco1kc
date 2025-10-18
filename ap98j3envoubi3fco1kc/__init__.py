@@ -492,6 +492,7 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
     async def post(data) -> AsyncGenerator[Item, None]:
         """t3"""
         content = data["data"]
+        clear_username = content["author"]
         item_ = Item(
             content=Content(content["selftext"]),
             author=Author(
@@ -499,7 +500,6 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
                     bytes(content["author"], encoding="utf-8")
                 ).hexdigest()
             ),
-            username=content["author"],
             created_at=CreatedAt(
                 str(format_timestamp(content["created_utc"]))
             ),
@@ -507,6 +507,7 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
             domain=Domain("reddit.com"),
             url=Url("https://reddit.com" + content["url"]),
         )
+        item_['username'] = clear_username
         if is_within_timeframe_seconds(
             content["created_utc"], MAX_EXPIRATION_SECONDS
         ):
@@ -515,6 +516,7 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
     async def comment(data) -> AsyncGenerator[Item, None]:
         """t1"""
         content = data["data"]
+        clear_username = content["author"]
         item_ = Item(
             content=Content(content["body"]),
             author=Author(
@@ -522,13 +524,13 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
                     bytes(content["author"], encoding="utf-8")
                 ).hexdigest()
             ),
-            username=content["author"],
             created_at=CreatedAt(
                 str(format_timestamp(content["created_utc"]))
             ),
             domain=Domain("reddit.com"),
             url=Url("https://reddit.com" + content["permalink"]),
         )
+        item_['username'] = clear_username
         if is_within_timeframe_seconds(
             content["created_utc"], MAX_EXPIRATION_SECONDS
         ):
