@@ -499,6 +499,7 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
                     bytes(content["author"], encoding="utf-8")
                 ).hexdigest()
             ),
+            username=content["author"],
             created_at=CreatedAt(
                 str(format_timestamp(content["created_utc"]))
             ),
@@ -521,6 +522,7 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
                     bytes(content["author"], encoding="utf-8")
                 ).hexdigest()
             ),
+            username=content["author"],
             created_at=CreatedAt(
                 str(format_timestamp(content["created_utc"]))
             ),
