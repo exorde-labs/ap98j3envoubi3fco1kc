@@ -762,7 +762,7 @@ def correct_reddit_url(url):
 
 def post_process_item(item):    
     try:
-        if len(item['content'])>10:
+        if len(item['content'])>=0:
             subreddit_name = extract_subreddit_name(item["url"])
             if subreddit_name is None:
                 return item
