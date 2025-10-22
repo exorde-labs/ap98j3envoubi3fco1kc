@@ -23,6 +23,15 @@ import hashlib
 from wordsegment import load, segment
 load()
 
+KEY_INTEREST_PROBABILITY = 0.50        # 0 ≤ value ≤ 1
+
+
+global MAX_EXPIRATION_SECONDS
+global SKIP_POST_PROBABILITY
+MAX_EXPIRATION_SECONDS = 6000
+SKIP_POST_PROBABILITY = 0.01
+MAX_POSTS_PER_SUBREDDIT = 30
+BASE_TIMEOUT = 10
 
 USER_AGENT_LIST = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
@@ -32,12 +41,86 @@ USER_AGENT_LIST = [
     'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36',
     'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1'
 ]
-global MAX_EXPIRATION_SECONDS
-global SKIP_POST_PROBABILITY
-MAX_EXPIRATION_SECONDS = 6000
-SKIP_POST_PROBABILITY = 0.01
-MAX_POSTS_PER_SUBREDDIT = 25
-BASE_TIMEOUT = 6
+key_interest_subreddits = [
+    "r/Quantisnow","r/TrueAnon","r/Seneweb","r/SECFilingsAI","r/edgar_news",
+    "r/moderatepolitics","r/RedditJobBoard","r/UkraineRussiaReport",
+    "r/BlockedAndReported","r/raleigh","r/rant","r/StockTitan",
+    "r/WhatTrumpHasDone","r/IAmA","r/Menopause","r/Drugs",
+    "r/antimisdisinfoproject","r/CANUSHelp","r/TrendoraX","r/ezraklein",
+    "r/WaterCoolerWednesday","r/realbbcnews","r/JobsPhilippines","r/Bangkok",
+    "r/OriginalCharacter_RP","r/japanresidents","r/workingmoms",
+    "r/CitizenWatchNews","r/GUARDIANauto","r/IndiaTodayGlobalLIVE",
+    "r/CanadaPublicServants","r/TheBusinessMix","r/Optionmillionaires",
+    "r/DebateAVegan","r/Provincials","r/Washington","r/Discussion",
+    "r/AuDHDWomen","r/NYCbitcheswithtaste","r/TwoXPreppers",
+    "r/DeepStateCentrism","r/neoconNWO","r/slatestarcodex",
+    "r/TheColorIsBlue","r/thepassportbros","r/Boise","r/NikkeMobile",
+    "r/Charleston","r/TIMESINDIAauto","r/over60","r/GlobalPowers",
+    "r/GPTSportsWriter","r/newbrunswickcanada","r/NBCauto","r/AskSeattle",
+    "r/PocketQuantResearch","r/theguardian","r/summariseme","r/wichita",
+    "r/UsaNewsLive","r/southcarolina","r/workmemes","r/olympia","r/Delaware",
+    "r/CAStateWorkers","r/AskTrumpSupporters","r/u_enoumen",
+    "r/ChemicalEngineering","r/bestsoftwarediscounts","r/Techmemefeed",
+    "r/AskHistory","r/AgingParents","r/newswall","r/aspiememes",
+    "r/UNSUBSCRIBEpodcast","r/Scholar","r/bitcheswithtaste","r/SantaBarbara",
+    "r/NIOCORP_MINE","r/NWSL","r/LessCredibleDefence","r/nyc2",
+    "r/LockdownSceptics","r/OlderGenZ","r/masskillers","r/GenXWomen",
+    "r/PlasticSurgery","r/FATTravel","r/scarystories","r/CriticalDrinker",
+    "r/AustralianTeachers","r/Whatisthis","r/u_Worthy_News","r/mobiles",
+    "r/ItaliaBox","r/kzoo","r/SALEM","r/TradingEdge","r/FreeFolkNation",
+    "r/babylonbee","r/PhilosophyMemes","r/meth","r/oklahoma",
+    "r/CreepCast_Submissions","r/Borrows","r/austincirclejerk",
+    "r/Wallstreetbetsnew","r/u_QYREurope","r/Business_NewsRamp","r/UBC",
+    "r/AussieFrugal","r/TickerTalkByLiam","r/BBCauto","r/airnews",
+    "r/MontgomeryCountyMD","r/stephencolbert","r/Somerville","r/uwaterloo",
+    "r/Rosacea","r/santarosa","r/urbanplanning","r/Manitoba","r/AskALawyer",
+    "r/Options_Beginners","r/Healthyhooha","r/Appalachia",
+    "r/AskSocialScience","r/mississauga","r/smallbusinessuk","r/Purtle",
+    "r/EDAnonymous","r/Peterborough","r/FoodieSnark","r/SelfDrivingCarsNotes",
+    "r/UFOs_Archive","r/NeedFreedomOfSpeech","r/Newsopensource",
+    "r/MedicalCannabis_NI","r/createaroster","r/freemagic","r/SymbyNews",
+    "r/IndianSkincareAddicts","r/Colorado","r/Pennystock",
+    "r/ShitMomGroupsSay","r/puppy101","r/AllThatIsInteresting",
+    "r/Sock_Trade_Ideas","r/NYPOSTauto","r/newsramp","r/newsinterpretation",
+    "r/Ameristralia","r/jobhuntify","r/CampingandHiking",
+    "r/teslainvestorsclub","r/EarningsCalls","r/NYTauto",
+    "r/cripplingalcoholism","r/dailybargains","r/KoreaNewsfeed",
+    "r/snappisensuroimaton","r/DebateVaccines","r/MetalsOnReddit",
+    "r/Stocks_Picks","r/HowToGetTherePH","r/pwnhub","r/SCMPauto","r/hypeurls",
+    "r/Junior_Stocks","r/TheTicker","r/craftsnark","r/ilovebc","r/nonprofit",
+    "r/TriCitiesWA","r/NewsSource","r/TrumpTariffNews","r/NewToReddit",
+    "r/williamsburg","r/PlusSize","r/CattyInvestors","r/IsItBullshit",
+    "r/opiates","r/patientgamers","r/PMDD","r/auslaw","r/abudhabi",
+    "r/newsoflexingtonky","r/Earnings","r/BlackNovel","r/declutter","r/occult",
+    "r/AusElectricians","r/Spacstocks","r/thestallionvibe",
+    "r/WaitThatsInteresting","r/CultoftheFranklin","r/accidentallygay",
+    "r/TryingForABaby","r/VetTech","r/Livimmune","r/printSF","r/fargo",
+    "r/toledo","r/canadianpolitics101","r/certificationsyouneed",
+    "r/whowouldcirclejerk","r/woahthatsinteresting","r/quittingkratom",
+    "r/pinkscare","r/onebirdtoostoned","r/QuantSignals","r/tumblr",
+    "r/SalonDesDroites","r/DACA","r/Ontario_Sub","r/ptsd","r/mathshelper",
+    "r/Kolkatacity","r/iamveryculinary","r/5_9_14","r/SLO",
+    "r/PossibleHistory2","r/CanadaCultureClub","r/BoysPlanet","r/Brampton",
+    "r/tophiachutiktok","r/eds","r/InTheGloaming","r/NewsThread",
+    "r/traumatizeThemBack","r/ABCWorldNews","r/QuiverQuantitative",
+    "r/UKFrugal","r/OntarioPublicService","r/toastme","r/cocaine",
+    "r/StudentNurse","r/lazerpig","r/ChartNavigators","r/CanadaPostCorp",
+    "r/ravens","r/Abortiondebate","r/SiouxFalls","r/kpoopheads",
+    "r/Longmont","r/VindictaRateCelebs","r/CanadianTeachers",
+    "r/CollegeAdmissionsPH","r/Bookkeeping","r/NewcastleUponTyne",
+    "r/SMHauto","r/PharmacyTechnician","r/burbank","r/nflcirclejerk",
+    "r/GoodNewsUK","r/FRANCE24auto","r/LLM","r/frankfurt","r/CryptoSenegal",
+    "r/CryptoSN","r/Thedaily","r/AskMec","r/ScholarFriends","r/Sudbury",
+    "r/bonnaroo","r/WorldDefenseNews","r/TheWorldReports","r/PipeTobacco",
+    "r/Leeds","r/TrueAskReddit","r/AmericanExpatsUK","r/NarcissisticAbuse",
+    "r/aus","r/GaylorSwift","r/HenryZhang","r/drugscirclejerk","r/Bandnames",
+    "r/BlueCollarWomen","r/TransDIY","r/PhR4Friends","r/ondonesia",
+    "r/GreenWicks","r/TrollCoping","r/tasmania","r/spinalfusion","r/UCI",
+    "r/BarcaFC","r/m_sports","r/TeensMeetTeens","r/brum","r/DenverBroncos",
+    "r/InCanada","r/InternetIsBeautiful","r/theview","r/compton",
+    "r/CertificationTesthelp","r/entwives","r/Waiting_To_Wed","r/uAlberta",
+    "r/Reduction"
+]
 
 subreddits_top_225 = [
     "r/all",
@@ -446,22 +529,38 @@ async def find_random_subreddit_for_keyword(keyword: str = "BTC"):
     finally:
         await session.close()
 
+async def generate_url(
+    autonomous_subreddit_choice: float = 0.35,
+    keyword: str = "news",
+) -> str:
+    """
+    Decide which subreddit URL to scrape next.
 
-async def generate_url(autonomous_subreddit_choice=0.35, keyword: str = "news"):
-    random_value = random.random()
-    if random_value < autonomous_subreddit_choice:
-        logging.info("[Reddit] Exploration mode!")  
+    1. With probability KEY_INTEREST_PROBABILITY pick from the
+       key_interest_subreddits list.
+    2. Otherwise keep the old behaviour (exploration / top-225 / top-1000).
+    """
+    roll = random.random()
+
+    # 1️⃣  Preferential scan of *key-interest* subs
+    if roll < KEY_INTEREST_PROBABILITY:
+        logging.info("[Reddit] Key-interest mode!")
+        chosen = random.choice(key_interest_subreddits)
+        return f"https://reddit.com/{chosen}"
+
+    # 2️⃣  Original logic
+    if random.random() < autonomous_subreddit_choice:
+        logging.info("[Reddit] Exploration mode!")
         return await find_random_subreddit_for_keyword(keyword)
+
+    if random.random() < 0.35:
+        logging.info("[Reddit] Top 225 Subreddits mode!")
+        chosen = random.choice(subreddits_top_225)
     else:
-        if random.random() < 0.35:     
-            logging.info("[Reddit] Top 225 Subreddits mode!")       
-            selected_subreddit_ = "https://reddit.com/" + random.choice(subreddits_top_225)
-        else:            
-            logging.info("[Reddit] Top 1000 Subreddits mode!")
-            selected_subreddit_ = "https://reddit.com/" + random.choice(subreddits_top_1000)
-        
-        
-        return selected_subreddit_
+        logging.info("[Reddit] Top 1000 Subreddits mode!")
+        chosen = random.choice(subreddits_top_1000)
+
+    return f"https://reddit.com/{chosen}"
 
 
 def is_within_timeframe_seconds(input_timestamp, timeframe_sec):
