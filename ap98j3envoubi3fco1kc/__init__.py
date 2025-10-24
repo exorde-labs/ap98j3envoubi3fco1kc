@@ -16,6 +16,8 @@ from exorde_data import (
     Author,
     CreatedAt,
     Title,
+    ExternalId,
+    ExternalParentId,
     Url,
     Domain,
 )
@@ -602,13 +604,12 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
             created_at=CreatedAt(
                 str(format_timestamp(content["created_utc"]))
             ),
+            external_id=ExternalId(content["id"]),
             title=Title(content["title"]),
             domain=Domain("reddit.com"),
             url=Url("https://reddit.com" + content["url"]),
         )
         item_['username'] = clear_username
-        item_['external_id'] = content["id"]  # Add external_id
-        item_['external_parent_id'] = None  # Posts don't have parents
         if is_within_timeframe_seconds(
             content["created_utc"], MAX_EXPIRATION_SECONDS
         ):
@@ -628,12 +629,13 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
             created_at=CreatedAt(
                 str(format_timestamp(content["created_utc"]))
             ),
+            external_id=ExternalId(content["id"]),
+            title=Title(content["title"] if "title" in content else ""),
+            external_parent_id=ExternalParentId(content.get("parent_id")),
             domain=Domain("reddit.com"),
             url=Url("https://reddit.com" + content["permalink"]),
         )
         item_['username'] = clear_username
-        item_['external_id'] = content["id"]  # Add external_id
-        item_['external_parent_id'] = content.get("parent_id")  # Add external_parent_id
         if is_within_timeframe_seconds(
             content["created_utc"], MAX_EXPIRATION_SECONDS
         ):
