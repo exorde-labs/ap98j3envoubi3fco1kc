@@ -607,6 +607,8 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
             url=Url("https://reddit.com" + content["url"]),
         )
         item_['username'] = clear_username
+        item_['external_id'] = content["id"]  # Add external_id
+        item_['external_parent_id'] = None  # Posts don't have parents
         if is_within_timeframe_seconds(
             content["created_utc"], MAX_EXPIRATION_SECONDS
         ):
@@ -630,6 +632,8 @@ async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
             url=Url("https://reddit.com" + content["permalink"]),
         )
         item_['username'] = clear_username
+        item_['external_id'] = content["id"]  # Add external_id
+        item_['external_parent_id'] = content.get("parent_id")  # Add external_parent_id
         if is_within_timeframe_seconds(
             content["created_utc"], MAX_EXPIRATION_SECONDS
         ):
