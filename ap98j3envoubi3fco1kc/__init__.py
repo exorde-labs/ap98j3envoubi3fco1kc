@@ -594,20 +594,17 @@ def extract_media_urls(data):
     
     # 1. Reddit videos (v.redd.it)
     for media_key in ['secure_media', 'media']:
-        if media_key in data and data[media_key]:
+        if media_key in data and data[media_key]:  # ✅ Already checks for None
             reddit_video = data[media_key].get('reddit_video', {})
             if reddit_video:
-                # Prefer fallback_url (highest quality available)
                 if 'fallback_url' in reddit_video:
                     media_urls.append(reddit_video['fallback_url'])
-                # Also check hls_url as alternative
                 elif 'hls_url' in reddit_video:
                     media_urls.append(reddit_video['hls_url'])
     
     # 2. Direct image/video URLs from url field
     if 'url' in data:
         url = data['url']
-        # Check if it's a media URL (not a reddit comments link)
         if any(domain in url for domain in ['i.redd.it', 'v.redd.it', 'external-preview.redd.it']):
             if url not in media_urls:
                 media_urls.append(url)
@@ -620,19 +617,18 @@ def extract_media_urls(data):
                 media_urls.append(dest_url)
     
     # 4. Preview images
-    if 'preview' in data and 'images' in data['preview']:
-        for image_data in data['preview']['images']:
-            # Get the source (highest quality)
-            if 'source' in image_data and 'url' in image_data['source']:
-                source_url = image_data['source']['url']
-                if source_url not in media_urls:
-                    media_urls.append(source_url)
+    if 'preview' in data and data['preview']:  # ✅ Add None check
+        if 'images' in data['preview']:
+            for image_data in data['preview']['images']:
+                if 'source' in image_data and 'url' in image_data['source']:
+                    source_url = image_data['source']['url']
+                    if source_url not in media_urls:
+                        media_urls.append(source_url)
     
     # 5. Gallery images (media_metadata)
-    if 'media_metadata' in data:
+    if 'media_metadata' in data and data['media_metadata']:  # ✅ Add None check
         for media_id, media_info in data['media_metadata'].items():
-            if media_info.get('status') == 'valid':
-                # Get the highest quality version
+            if media_info and media_info.get('status') == 'valid':  # ✅ Check media_info is not None
                 if 's' in media_info and 'u' in media_info['s']:
                     url = media_info['s']['u']
                     if url not in media_urls:
@@ -647,11 +643,11 @@ def extract_media_urls(data):
         thumb = data['thumbnail']
         if thumb and thumb not in ['self', 'default', 'nsfw', 'spoiler', 'image']:
             if thumb.startswith('http') and thumb not in media_urls:
-                # Only add if it's a full URL and not already captured
                 if any(domain in thumb for domain in ['thumbs.redd', 'external-preview.redd']):
                     media_urls.append(thumb)
     
     return media_urls
+
 
 async def scrap_post(url: str) -> AsyncGenerator[Item, None]:    
     max_retries = 3
