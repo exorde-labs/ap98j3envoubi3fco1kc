@@ -588,75 +588,85 @@ def extract_subreddit_name(input_string):
     return None
 
 
-    async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
-        resolvers = {}
+def extract_media_urls(data):
+    """Extract all media URLs from Reddit post/comment data"""
+    media_urls = []
     
-        def extract_media_urls(data):
-        """Extract all media URLs from Reddit post/comment data"""
-        media_urls = []
-        
-        # 1. Reddit videos (v.redd.it)
-        for media_key in ['secure_media', 'media']:
-            if media_key in data and data[media_key]:
-                reddit_video = data[media_key].get('reddit_video', {})
-                if reddit_video:
-                    # Prefer fallback_url (highest quality available)
-                    if 'fallback_url' in reddit_video:
-                        media_urls.append(reddit_video['fallback_url'])
-                    # Also check hls_url as alternative
-                    elif 'hls_url' in reddit_video:
-                        media_urls.append(reddit_video['hls_url'])
-        
-        # 2. Direct image/video URLs from url field
-        if 'url' in data:
-            url = data['url']
-            # Check if it's a media URL (not a reddit comments link)
-            if any(domain in url for domain in ['i.redd.it', 'v.redd.it', 'external-preview.redd.it']):
-                if url not in media_urls:
-                    media_urls.append(url)
-        
-        # 3. URL overridden by dest (for crossposts/redirects)
-        if 'url_overridden_by_dest' in data:
-            dest_url = data['url_overridden_by_dest']
-            if any(domain in dest_url for domain in ['i.redd.it', 'v.redd.it']):
-                if dest_url not in media_urls:
-                    media_urls.append(dest_url)
-        
-        # 4. Preview images
-        if 'preview' in data and 'images' in data['preview']:
-            for image_data in data['preview']['images']:
-                # Get the source (highest quality)
-                if 'source' in image_data and 'url' in image_data['source']:
-                    source_url = image_data['source']['url']
-                    if source_url not in media_urls:
-                        media_urls.append(source_url)
-        
-        # 5. Gallery images (media_metadata)
-        if 'media_metadata' in data:
-            for media_id, media_info in data['media_metadata'].items():
-                if media_info.get('status') == 'valid':
-                    # Get the highest quality version
-                    if 's' in media_info and 'u' in media_info['s']:
-                        url = media_info['s']['u']
-                        if url not in media_urls:
-                            media_urls.append(url)
-                    elif 's' in media_info and 'gif' in media_info['s']:
-                        url = media_info['s']['gif']
-                        if url not in media_urls:
-                            media_urls.append(url)
-        
-        # 6. Thumbnail (as fallback, only if high quality)
-        if 'thumbnail' in data:
-            thumb = data['thumbnail']
-            if thumb and thumb not in ['self', 'default', 'nsfw', 'spoiler', 'image']:
-                if thumb.startswith('http') and thumb not in media_urls:
-                    # Only add if it's a full URL and not already captured
-                    if any(domain in thumb for domain in ['thumbs.redd', 'external-preview.redd']):
-                        media_urls.append(thumb)
-        
-        return media_urls
+    # 1. Reddit videos (v.redd.it)
+    for media_key in ['secure_media', 'media']:
+        if media_key in data and data[media_key]:
+            reddit_video = data[media_key].get('reddit_video', {})
+            if reddit_video:
+                # Prefer fallback_url (highest quality available)
+                if 'fallback_url' in reddit_video:
+                    media_urls.append(reddit_video['fallback_url'])
+                # Also check hls_url as alternative
+                elif 'hls_url' in reddit_video:
+                    media_urls.append(reddit_video['hls_url'])
+    
+    # 2. Direct image/video URLs from url field
+    if 'url' in data:
+        url = data['url']
+        # Check if it's a media URL (not a reddit comments link)
+        if any(domain in url for domain in ['i.redd.it', 'v.redd.it', 'external-preview.redd.it']):
+            if url not in media_urls:
+                media_urls.append(url)
+    
+    # 3. URL overridden by dest (for crossposts/redirects)
+    if 'url_overridden_by_dest' in data:
+        dest_url = data['url_overridden_by_dest']
+        if any(domain in dest_url for domain in ['i.redd.it', 'v.redd.it']):
+            if dest_url not in media_urls:
+                media_urls.append(dest_url)
+    
+    # 4. Preview images
+    if 'preview' in data and 'images' in data['preview']:
+        for image_data in data['preview']['images']:
+            # Get the source (highest quality)
+            if 'source' in image_data and 'url' in image_data['source']:
+                source_url = image_data['source']['url']
+                if source_url not in media_urls:
+                    media_urls.append(source_url)
+    
+    # 5. Gallery images (media_metadata)
+    if 'media_metadata' in data:
+        for media_id, media_info in data['media_metadata'].items():
+            if media_info.get('status') == 'valid':
+                # Get the highest quality version
+                if 's' in media_info and 'u' in media_info['s']:
+                    url = media_info['s']['u']
+                    if url not in media_urls:
+                        media_urls.append(url)
+                elif 's' in media_info and 'gif' in media_info['s']:
+                    url = media_info['s']['gif']
+                    if url not in media_urls:
+                        media_urls.append(url)
+    
+    # 6. Thumbnail (as fallback, only if high quality)
+    if 'thumbnail' in data:
+        thumb = data['thumbnail']
+        if thumb and thumb not in ['self', 'default', 'nsfw', 'spoiler', 'image']:
+            if thumb.startswith('http') and thumb not in media_urls:
+                # Only add if it's a full URL and not already captured
+                if any(domain in thumb for domain in ['thumbs.redd', 'external-preview.redd']):
+                    media_urls.append(thumb)
+    
+    return media_urls
 
+async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
+    
+    resolvers = {
+        "Listing": listing,
+        "t1": comment,
+        "t3": post,
+        "more": more
+    }
+    
+    
+    max_retries = 3
+    base_delay = 10  # Start with 10 seconds for 429
 
+    
     async def post(data) -> AsyncGenerator[Item, None]:
         """t3"""
         content = data["data"]
@@ -691,7 +701,7 @@ def extract_subreddit_name(input_string):
             content["created_utc"], MAX_EXPIRATION_SECONDS
         ):
             yield item_
-
+    
     
     async def comment(data) -> AsyncGenerator[Item, None]:
         """t1"""
@@ -812,7 +822,7 @@ async def scrap_subreddit_new_layout(subreddit_url: str) -> AsyncGenerator[Item,
                     if url.startswith("/r/"):
                         url = "https://www.reddit.com" + post
                     # await sleep randomly between 1-2s
-                    await asyncio.sleep(random.uniform(1, 2))
+                    await asyncio.sleep(random.uniform(2, 6))
                     try:
                         if "https" not in url:
                             url = f"https://reddit.com{url}"
@@ -849,7 +859,7 @@ async def scrap_subreddit_json(subreddit_url: str) -> AsyncGenerator[Item, None]
                 url_to_fetch = url_to_fetch.replace("https:///", "https://")
             logging.info("[Reddit] [JSON MODE] opening: %s",url_to_fetch)
             # sleep random between 0.1-0.5s
-            await asyncio.sleep(random.uniform(1, 3))
+            await asyncio.sleep(random.uniform(3, 7))
             async with session.get(url_to_fetch,                                     
                 headers={"User-Agent": random.choice(USER_AGENT_LIST)},      
                 timeout=BASE_TIMEOUT) as response:
@@ -993,7 +1003,7 @@ async def query(parameters: dict) -> AsyncGenerator[Item, None]:
     logging.info(f"[Reddit] Input parameters: {parameters}")
     MAX_EXPIRATION_SECONDS = max_oldness_seconds
     yielded_items = 0  # Counter for the number of yielded items
-    await asyncio.sleep(random.uniform(0, 1))
+    await asyncio.sleep(random.uniform(0,2))
     for i in range(nb_subreddit_attempts):
         await asyncio.sleep(random.uniform(1, i))
         url = await generate_url(**parameters["url_parameters"])
