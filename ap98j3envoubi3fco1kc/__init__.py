@@ -587,66 +587,87 @@ def extract_subreddit_name(input_string):
         return match.group(1)
     return None
 
-
 def extract_media_urls(data):
-    """Extract all media URLs from Reddit post/comment data"""
+    """Extract all media URLs from Reddit post/comment data - prioritizes highest quality"""
     media_urls = []
     
-    # 1. Reddit videos (v.redd.it)
+    # 1. Reddit videos (v.redd.it) - best quality available
     for media_key in ['secure_media', 'media']:
-        if media_key in data and data[media_key]:  # ✅ Already checks for None
+        if media_key in data and data[media_key]:
             reddit_video = data[media_key].get('reddit_video', {})
             if reddit_video:
+                # Prefer fallback_url (direct MP4, highest quality)
                 if 'fallback_url' in reddit_video:
                     media_urls.append(reddit_video['fallback_url'])
                 elif 'hls_url' in reddit_video:
                     media_urls.append(reddit_video['hls_url'])
     
-    # 2. Direct image/video URLs from url field
+    # 2. Direct image URLs (PRIORITY: original quality from i.redd.it or v.redd.it)
+    # Check url_overridden_by_dest first (this is the original)
+    if 'url_overridden_by_dest' in data:
+        dest_url = data['url_overridden_by_dest']
+        # Accept i.redd.it, v.redd.it, and gallery.redd.it
+        if any(domain in dest_url for domain in ['i.redd.it', 'v.redd.it', 'gallery.redd.it']):
+            if dest_url not in media_urls:
+                media_urls.append(dest_url)
+    
+    # 3. Check url field if url_overridden_by_dest didn't work
     if 'url' in data:
         url = data['url']
+        # Only add if it's a direct media URL and not already added
         if any(domain in url for domain in ['i.redd.it', 'v.redd.it', 'external-preview.redd.it']):
             if url not in media_urls:
                 media_urls.append(url)
     
-    # 3. URL overridden by dest (for crossposts/redirects)
-    if 'url_overridden_by_dest' in data:
-        dest_url = data['url_overridden_by_dest']
-        if any(domain in dest_url for domain in ['i.redd.it', 'v.redd.it']):
-            if dest_url not in media_urls:
-                media_urls.append(dest_url)
-    
-    # 4. Preview images
-    if 'preview' in data and data['preview']:  # ✅ Add None check
-        if 'images' in data['preview']:
-            for image_data in data['preview']['images']:
-                if 'source' in image_data and 'url' in image_data['source']:
-                    source_url = image_data['source']['url']
-                    if source_url not in media_urls:
-                        media_urls.append(source_url)
-    
-    # 5. Gallery images (media_metadata)
-    if 'media_metadata' in data and data['media_metadata']:  # ✅ Add None check
+    # 4. Gallery images (media_metadata) - original quality
+    if 'media_metadata' in data and data['media_metadata']:
         for media_id, media_info in data['media_metadata'].items():
-            if media_info and media_info.get('status') == 'valid':  # ✅ Check media_info is not None
-                if 's' in media_info and 'u' in media_info['s']:
-                    url = media_info['s']['u']
-                    if url not in media_urls:
-                        media_urls.append(url)
-                elif 's' in media_info and 'gif' in media_info['s']:
-                    url = media_info['s']['gif']
-                    if url not in media_urls:
-                        media_urls.append(url)
+            if media_info and media_info.get('status') == 'valid':
+                # Try to get the highest quality source
+                if 's' in media_info:
+                    # Check for 'u' (unobfuscated URL - original quality)
+                    if 'u' in media_info['s']:
+                        url = media_info['s']['u']
+                        # Decode HTML entities if needed
+                        url = url.replace('&amp;', '&')
+                        if url not in media_urls:
+                            media_urls.append(url)
+                    # Fallback to 'gif' for animated content
+                    elif 'gif' in media_info['s']:
+                        url = media_info['s']['gif']
+                        url = url.replace('&amp;', '&')
+                        if url not in media_urls:
+                            media_urls.append(url)
     
-    # 6. Thumbnail (as fallback, only if high quality)
-    if 'thumbnail' in data:
-        thumb = data['thumbnail']
-        if thumb and thumb not in ['self', 'default', 'nsfw', 'spoiler', 'image']:
-            if thumb.startswith('http') and thumb not in media_urls:
-                if any(domain in thumb for domain in ['thumbs.redd', 'external-preview.redd']):
-                    media_urls.append(thumb)
+    # 5. Preview images - ONLY if no direct i.redd.it URL was found
+    # This ensures we prefer original over processed preview
+    if not any('i.redd.it' in url or 'gallery.redd.it' in url for url in media_urls):
+        if 'preview' in data and data['preview']:
+            if 'images' in data['preview'] and data['preview']['images']:
+                # Get the source (highest quality preview available)
+                for image_data in data['preview']['images']:
+                    if 'source' in image_data and 'url' in image_data['source']:
+                        source_url = image_data['source']['url']
+                        # Decode HTML entities
+                        source_url = source_url.replace('&amp;', '&')
+                        if source_url not in media_urls:
+                            media_urls.append(source_url)
+                            break  # Only take the first/main image source
+    
+    # 6. External preview images (for links to other sites)
+    if 'preview' in data and data['preview']:
+        if 'images' in data['preview'] and data['preview']['images']:
+            for image_data in data['preview']['images']:
+                # Check if there's an external source
+                if 'source' in image_data:
+                    source_url = image_data['source'].get('url', '')
+                    if 'external-preview.redd.it' in source_url:
+                        source_url = source_url.replace('&amp;', '&')
+                        if source_url not in media_urls:
+                            media_urls.append(source_url)
     
     return media_urls
+
 
 
 async def scrap_post(url: str) -> AsyncGenerator[Item, None]:    
