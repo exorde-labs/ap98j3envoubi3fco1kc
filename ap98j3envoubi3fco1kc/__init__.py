@@ -653,12 +653,7 @@ def extract_media_urls(data):
     
     return media_urls
 
-async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
-    
-    resolvers = {
-    }
-    
-    
+async def scrap_post(url: str) -> AsyncGenerator[Item, None]:    
     max_retries = 3
     base_delay = 10  # Start with 10 seconds for 429
 
