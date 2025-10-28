@@ -656,10 +656,6 @@ def extract_media_urls(data):
 async def scrap_post(url: str) -> AsyncGenerator[Item, None]:
     
     resolvers = {
-        "Listing": listing,
-        "t1": comment,
-        "t3": post,
-        "more": more
     }
     
     
